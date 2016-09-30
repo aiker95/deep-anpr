@@ -34,8 +34,8 @@ __all__ = (
 import numpy
 
 
-DIGITS = "0123456789"
-LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+DIGITS  = "0123456789"
+LETTERS = "abcehkmoptxy_"
 CHARS = LETTERS + DIGITS
 
 def softmax(a):

@@ -45,7 +45,7 @@ import numpy
 import tensorflow as tf
 
 import common
-import gen
+#import gen
 import model
 
 
@@ -62,9 +62,11 @@ def code_to_vec(p, code):
 
 def read_data(img_glob):
     for fname in sorted(glob.glob(img_glob)):
+        print fname
         im = cv2.imread(fname)[:, :, 0].astype(numpy.float32) / 255.
-        code = fname.split("/")[1][9:16]
-        p = fname.split("/")[1][17] == '1'
+        tmp = fname.split("/")[-1].split("-")
+        code = tmp[0]
+        p = len(tmp)>1 and tmp[1] == '1'
         yield im, code_to_vec(p, code)
 
 
@@ -75,47 +77,52 @@ def unzip(b):
     return xs, ys
 
 
-def batch(it, batch_size):
-    out = []
-    for x in it:
-        out.append(x)
-        if len(out) == batch_size:
-            yield out
-            out = []
-    if out:
-        yield out
+#def batch(it, batch_size):
+#    out = []
+#    for x in it:
+#        out.append(x)
+#        if len(out) == batch_size:
+#            yield out
+#            out = []
+#    if out:
+#        yield out
 
 
-def mpgen(f):
-    def main(q, args, kwargs):
-        try:
-            for item in f(*args, **kwargs):
-                q.put(item)
-        finally:
-            q.close()
-
-    @functools.wraps(f)
-    def wrapped(*args, **kwargs):
-        q = multiprocessing.Queue(3) 
-        proc = multiprocessing.Process(target=main,
-                                       args=(q, args, kwargs))
-        proc.start()
-        try:
-            while True:
-                item = q.get()
-                yield item
-        finally:
-            proc.terminate()
-            proc.join()
-
-    return wrapped
-        
-
-@mpgen
+# def mpgen(f):
+#     def main(q, args, kwargs):
+#         try:
+#             for item in f(*args, **kwargs):
+#                 q.put(item)
+#         finally:
+#             q.close()
+#
+#     @functools.wraps(f)
+#     def wrapped(*args, **kwargs):
+#         q = multiprocessing.Queue(3)
+#         proc = multiprocessing.Process(target=main,
+#                                        args=(q, args, kwargs))
+#         proc.start()
+#         try:
+#             while True:
+#                 item = q.get()
+#                 yield item
+#         finally:
+#             proc.terminate()
+#             proc.join()
+#
+#     return wrapped
+#
+#
+#@mpgen
 def read_batches(batch_size):
     def gen_vecs():
-        for im, c, p in gen.generate_ims(batch_size):
-            yield im, code_to_vec(p, c)
+        count = batch_size
+        for im, c in read_data("test/*.png"):
+            count -= 1
+            if count == 0:
+                break
+            print count
+            yield im, c
 
     while True:
         yield unzip(gen_vecs())
@@ -147,7 +154,7 @@ def train(learn_rate, report_steps, batch_size, initial_weights=None):
     """
     x, y, params = model.get_training_model()
 
-    y_ = tf.placeholder(tf.float32, [None, 7 * len(common.CHARS) + 1])
+    y_ = tf.placeholder(tf.float32, [None, 9 * len(common.CHARS) + 1])
 
     digits_loss = tf.nn.softmax_cross_entropy_with_logits(
                                           tf.reshape(y[:, 1:],
@@ -161,8 +168,8 @@ def train(learn_rate, report_steps, batch_size, initial_weights=None):
     cross_entropy = digits_loss + presence_loss
     train_step = tf.train.AdamOptimizer(learn_rate).minimize(cross_entropy)
 
-    best = tf.argmax(tf.reshape(y[:, 1:], [-1, 7, len(common.CHARS)]), 2)
-    correct = tf.argmax(tf.reshape(y_[:, 1:], [-1, 7, len(common.CHARS)]), 2)
+    best = tf.argmax(tf.reshape(y[:, 1:], [-1, 9, len(common.CHARS)]), 2)
+    correct = tf.argmax(tf.reshape(y_[:, 1:], [-1, 9, len(common.CHARS)]), 2)
 
     if initial_weights is not None:
         assert len(params) == len(initial_weights)

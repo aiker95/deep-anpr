@@ -102,7 +102,7 @@ def convolutional_layers():
 def get_training_model():
     """
     The training model acts on a batch of 128x64 windows, and outputs a (1 +
-    7 * len(common.CHARS) vector, `v`. `v[0]` is the probability that a plate is
+    9 * len(common.CHARS) vector, `v`. `v[0]` is the probability that a plate is
     fully within the image and is at the correct scale.
     
     `v[1 + i * len(common.CHARS) + c]` is the probability that the `i`'th
@@ -119,8 +119,8 @@ def get_training_model():
     h_fc1 = tf.nn.relu(tf.matmul(conv_layer_flat, W_fc1) + b_fc1)
 
     # Output layer
-    W_fc2 = weight_variable([2048, 1 + 7 * len(common.CHARS)])
-    b_fc2 = bias_variable([1 + 7 * len(common.CHARS)])
+    W_fc2 = weight_variable([2048, 1 + 9 * len(common.CHARS)])
+    b_fc2 = bias_variable([1 + 9 * len(common.CHARS)])
 
     y = tf.matmul(h_fc1, W_fc2) + b_fc2
 
@@ -145,9 +145,9 @@ def get_detect_model():
     h_conv1 = tf.nn.relu(conv2d(conv_layer, W_conv1,
                                 stride=(1, 1), padding="VALID") + b_fc1) 
     # Fifth layer
-    W_fc2 = weight_variable([2048, 1 + 7 * len(common.CHARS)])
-    W_conv2 = tf.reshape(W_fc2, [1, 1, 2048, 1 + 7 * len(common.CHARS)])
-    b_fc2 = bias_variable([1 + 7 * len(common.CHARS)])
+    W_fc2 = weight_variable([2048, 1 + 9 * len(common.CHARS)])
+    W_conv2 = tf.reshape(W_fc2, [1, 1, 2048, 1 + 9 * len(common.CHARS)])
+    b_fc2 = bias_variable([1 + 9 * len(common.CHARS)])
     h_conv2 = conv2d(h_conv1, W_conv2) + b_fc2
 
     return (x, h_conv2, conv_vars + [W_fc1, b_fc1, W_fc2, b_fc2])
