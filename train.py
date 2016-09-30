@@ -62,11 +62,12 @@ def code_to_vec(p, code):
 
 def read_data(img_glob):
     for fname in sorted(glob.glob(img_glob)):
-        print fname
+        #print fname
         im = cv2.imread(fname)[:, :, 0].astype(numpy.float32) / 255.
         tmp = fname.split("/")[-1].split("-")
-        code = tmp[0]
-        p = len(tmp)>1 and tmp[1] == '1'
+        code = tmp[1]
+        p = len(tmp)>1 and tmp[2] == '1'
+        #print code , " ", p
         yield im, code_to_vec(p, code)
 
 
@@ -121,7 +122,7 @@ def read_batches(batch_size):
             count -= 1
             if count == 0:
                 break
-            print count
+            #print count
             yield im, c
 
     while True:
