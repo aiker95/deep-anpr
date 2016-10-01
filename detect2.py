@@ -123,8 +123,8 @@ if __name__ == "__main__":
     for present_prob, letter_probs in detect(im_gray, param_vals):
 
         code = letter_probs_to_code(letter_probs)
-
+        print code
         color = (0.0, 255.0, 0.0)
 
-    cv2.imwrite(sys.argv[3], im)
+    #cv2.imwrite(sys.argv[3], im)
 
