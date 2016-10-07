@@ -59,10 +59,15 @@ def code_to_vec(p, code):
 
     return numpy.concatenate([[1. if p else 0], c.flatten()])
 
+def read_console():
+    while True:
+        line = sys.stdin.readline()
+        yield line.strip()
 
-def read_data(img_glob):
-    for fname in sorted(glob.glob(img_glob)):
-        #print fname
+
+def read_data():
+    for fname in read_console():
+        #print "=", fname, "|"
         im = cv2.imread(fname)[:, :, 0].astype(numpy.float32) / 255.
         tmp = fname.split("/")[-1].split("-")
         code = tmp[1]
@@ -116,17 +121,9 @@ def unzip(b):
 #
 #@mpgen
 def read_batches(batch_size):
-    def gen_vecs():
-        count = batch_size
-        for im, c in read_data("test/*.png"):
-            count -= 1
-            if count == 0:
-                break
-            #print count
-            yield im, c
-
     while True:
-        yield unzip(gen_vecs())
+        b = list(itertools.islice(read_data(), batch_size))
+        yield unzip(b)
 
 
 def train(learn_rate, report_steps, batch_size, initial_weights=None):
@@ -213,8 +210,8 @@ def train(learn_rate, report_steps, batch_size, initial_weights=None):
                                            for b, c, pb, pc in zip(*r_short)))
 
     def do_batch():
-        sess.run(train_step,
-                 feed_dict={x: batch_xs, y_: batch_ys})
+        feed_dict = {x: batch_xs, y_: batch_ys}
+        sess.run(train_step, feed_dict)
         if batch_idx % report_steps == 0:
             do_report()
 
@@ -224,13 +221,17 @@ def train(learn_rate, report_steps, batch_size, initial_weights=None):
         if initial_weights is not None:
             sess.run(assign_ops)
 
-        test_xs, test_ys = unzip(list(read_data("test/*.png"))[:50])
-
+        test_xs, test_ys = unzip(itertools.islice(read_data(), 50))
+        print "after read_data"
         try:
             last_batch_idx = 0
             last_batch_time = time.time()
-            batch_iter = enumerate(read_batches(batch_size))
-            for batch_idx, (batch_xs, batch_ys) in batch_iter:
+            print "before read batch"
+            batch_iter = read_batches(batch_size)
+            print "after read batch"
+            batch_idx = 0
+            for (batch_xs, batch_ys) in batch_iter:
+                batch_idx += 1
                 do_batch()
                 if batch_idx % report_steps == 0:
                     batch_time = time.time()

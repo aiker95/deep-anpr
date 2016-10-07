@@ -188,7 +188,7 @@ if __name__ == "__main__":
         pt2 = tuple(reversed(map(int, pt2)))
 
         code = letter_probs_to_code(letter_probs)
-
+        print  code
         color = (0.0, 255.0, 0.0)
         cv2.rectangle(im, pt1, pt2, color)
 
