@@ -34,6 +34,7 @@ __all__ = (
 
 import functools
 import glob
+from os import walk
 import itertools
 import multiprocessing
 import random
@@ -75,6 +76,20 @@ def read_data():
         #print code , " ", p
         yield im, code_to_vec(p, code)
 
+def read_validation_data():
+    f = []
+    for (dirpath, dirnames, filenames) in walk("validation"):
+        f.extend(filenames)
+        break
+    for fname in f:
+        #print "=", fname, "|"
+        im = cv2.imread("validation/"+fname)[:, :, 0].astype(numpy.float32) / 255.
+        tmp = fname.split("/")[-1].split("-")
+        code = tmp[1]
+        p = len(tmp)>1 and tmp[2] == '1'
+        print code , " ", p
+        yield im, code_to_vec(p, code)
+
 
 def unzip(b):
     xs, ys = zip(*b)
@@ -83,43 +98,7 @@ def unzip(b):
     return xs, ys
 
 
-#def batch(it, batch_size):
-#    out = []
-#    for x in it:
-#        out.append(x)
-#        if len(out) == batch_size:
-#            yield out
-#            out = []
-#    if out:
-#        yield out
 
-
-# def mpgen(f):
-#     def main(q, args, kwargs):
-#         try:
-#             for item in f(*args, **kwargs):
-#                 q.put(item)
-#         finally:
-#             q.close()
-#
-#     @functools.wraps(f)
-#     def wrapped(*args, **kwargs):
-#         q = multiprocessing.Queue(3)
-#         proc = multiprocessing.Process(target=main,
-#                                        args=(q, args, kwargs))
-#         proc.start()
-#         try:
-#             while True:
-#                 item = q.get()
-#                 yield item
-#         finally:
-#             proc.terminate()
-#             proc.join()
-#
-#     return wrapped
-#
-#
-#@mpgen
 def read_batches(batch_size):
     while True:
         b = list(itertools.islice(read_data(), batch_size))
@@ -221,7 +200,7 @@ def train(learn_rate, report_steps, batch_size, initial_weights=None):
         if initial_weights is not None:
             sess.run(assign_ops)
 
-        test_xs, test_ys = unzip(itertools.islice(read_data(), 50))
+        test_xs, test_ys = unzip(read_validation_data())
         print "after read_data"
         try:
             last_batch_idx = 0

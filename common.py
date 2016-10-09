@@ -35,7 +35,7 @@ import numpy
 
 
 DIGITS  = "0123456789"
-LETTERS = "abcehkmoptxy_"
+LETTERS = "ABCEHKMOPTXY_"
 CHARS = LETTERS + DIGITS
 
 def softmax(a):

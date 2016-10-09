@@ -104,7 +104,7 @@ def detect(im, param_vals):
             letter_probs = (y_val[0,
                                   window_coords[0],
                                   window_coords[1], 1:].reshape(
-                                    7, len(common.CHARS)))
+                                    9, len(common.CHARS)))
             letter_probs = common.softmax(letter_probs)
 
             img_scale = float(im.shape[0]) / scaled_im.shape[0]
