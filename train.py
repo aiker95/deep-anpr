@@ -69,11 +69,14 @@ def read_console():
 def read_data():
     for fname in read_console():
         #print "=", fname, "|"
-        im = cv2.imread(fname)[:, :, 0].astype(numpy.float32) / 255.
+        im = cv2.resize(cv2.imread(fname), (128, 64))[:, :, 0].astype(numpy.float32) / 255.
+
         tmp = fname.split("/")[-1].split("-")
         code = tmp[1]
-        p = len(tmp)>1 and tmp[2] == '1'
-        #print code , " ", p
+        if len(code)==8:
+            code += "_"
+        p = len(tmp)==9
+        print code , " ", p
         yield im, code_to_vec(p, code)
 
 def read_validation_data():
@@ -83,10 +86,13 @@ def read_validation_data():
         break
     for fname in f:
         #print "=", fname, "|"
-        im = cv2.imread("validation/"+fname)[:, :, 0].astype(numpy.float32) / 255.
+        im = cv2.resize(cv2.imread("validation/"+fname), (128, 64))[:, :, 0].astype(numpy.float32) / 255.
+
         tmp = fname.split("/")[-1].split("-")
         code = tmp[1]
-        p = len(tmp)>1 and tmp[2] == '1'
+        if len(code)==8:
+            code += "_"
+        p = len(code)==9
         print code , " ", p
         yield im, code_to_vec(p, code)
 
