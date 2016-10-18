@@ -80,7 +80,7 @@ def read_data():
         if len(code)==8:
             code += "_"
         p = len(code)==9
-        print code , " ", p
+        #print code , " ", p
         yield im, code_to_vec(p, code)
 
 def read_validation_data():
