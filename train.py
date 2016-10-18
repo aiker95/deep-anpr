@@ -81,6 +81,7 @@ def read_data():
             yield im, code_to_vec(p, code)
         except:
             print "fail on ", fname
+            continue
 
 def read_validation_data():
     f = []
