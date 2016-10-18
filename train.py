@@ -69,15 +69,18 @@ def read_console():
 def read_data():
     for fname in read_console():
         #print "=", fname, "|"
-        im = cv2.resize(cv2.imread(fname), (128, 64))[:, :, 0].astype(numpy.float32) / 255.
+        try:
+            im = cv2.resize(cv2.imread(fname), (128, 64))[:, :, 0].astype(numpy.float32) / 255.
 
-        tmp = fname.split("/")[-1].split("-")
-        code = tmp[1]
-        if len(code)==8:
-            code += "_"
-        p = len(tmp)==9
-        print code , " ", p
-        yield im, code_to_vec(p, code)
+            tmp = fname.split("/")[-1].split("-")
+            code = tmp[1]
+            if len(code)==8:
+                code += "_"
+            p = len(code)==9
+            print code , " ", p
+            yield im, code_to_vec(p, code)
+        except:
+            print "fail on ", fname
 
 def read_validation_data():
     f = []
