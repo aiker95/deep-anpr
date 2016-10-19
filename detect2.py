@@ -114,7 +114,7 @@ def letter_probs_to_code(letter_probs):
 
 
 if __name__ == "__main__":
-    im = cv2.imread(sys.argv[1])
+    im = cv2.resize(cv2.imread(sys.argv[1]), (128, 64))
     im_gray = cv2.cvtColor(im, cv2.COLOR_RGB2GRAY) / 255.
 
     f = numpy.load(sys.argv[2])

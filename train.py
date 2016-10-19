@@ -75,8 +75,7 @@ def read_data():
             print "fail on ", fname
             continue
 
-        tmp = fname.split("/")[-1].split("-")
-        code = tmp[1]
+        code = fname.split("/")[-2]
         if len(code)==8:
             code += "_"
         p = len(code)==9
