@@ -141,7 +141,7 @@ def train(learn_rate, report_steps, batch_size, initial_weights=None):
     x, y, params = model.get_training_model()
 
     y_ = tf.placeholder(tf.float32, [None, 9 * len(common.CHARS) + 1])
-
+    keep_prob = tf.placeholder(tf.float32)
     digits_loss = tf.nn.softmax_cross_entropy_with_logits(
                                           tf.reshape(y[:, 1:],
                                                      [-1, len(common.CHARS)]),
@@ -174,7 +174,7 @@ def train(learn_rate, report_steps, batch_size, initial_weights=None):
                       digits_loss,
                       presence_loss,
                       cross_entropy],
-                     feed_dict={x: test_xs, y_: test_ys})
+                     feed_dict={x: test_xs, y_: test_ys, keep_prob: 1.0})
         num_correct = numpy.sum(
                         numpy.logical_or(
                             numpy.all(r[0] == r[1], axis=1),
@@ -198,7 +198,7 @@ def train(learn_rate, report_steps, batch_size, initial_weights=None):
                                            for b, c, pb, pc in zip(*r_short)))
 
     def do_batch():
-        feed_dict = {x: batch_xs, y_: batch_ys}
+        feed_dict = {x: batch_xs, y_: batch_ys, keep_prob: 0.5}
         sess.run(train_step, feed_dict)
         if batch_idx % report_steps == 0:
             do_report()
