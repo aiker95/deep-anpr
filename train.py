@@ -205,9 +205,9 @@ def train(learn_rate, report_steps, batch_size, initial_weights=None):
 
     gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.95)
     with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options)) as sess:
-        sess.run(init)
+        sess.run(init, feed_dict={keep_prob: 0.5})
         if initial_weights is not None:
-            sess.run(assign_ops)
+            sess.run(assign_ops, feed_dict={keep_prob: 0.5})
 
         test_xs, test_ys = unzip(read_validation_data())
         print "after read_data"
