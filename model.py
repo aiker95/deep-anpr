@@ -122,10 +122,11 @@ def get_training_model():
     W_fc2 = weight_variable([2048, 1 + 9 * len(common.CHARS)])
     b_fc2 = bias_variable([1 + 9 * len(common.CHARS)])
 
-    #keep_prob = tf.placeholder(tf.float32)
+#    keep_prob = tf.placeholder(tf.float32)
+#    h_fc1_drop = tf.nn.dropout(h_fc1, 0.5)
+#    y = tf.matmul(h_fc1_drop, W_fc2) + b_fc2
 
-    h_fc1_drop = tf.nn.dropout(h_fc1, 0.5)
-    y = tf.matmul(h_fc1_drop, W_fc2) + b_fc2
+    y = tf.matmul(h_fc1, W_fc2) + b_fc2
 
     return (x, y, conv_vars + [W_fc1, b_fc1, W_fc2, b_fc2])
 

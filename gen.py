@@ -47,30 +47,53 @@ from PIL import ImageFont
 
 import common
 
-FONT_PATH = "UKNumberPlate.ttf"
+FONT_PATH = "RoadNumbers2.0.ttf"
 FONT_HEIGHT = 32  # Pixel size to which the chars are resized
 
-OUTPUT_SHAPE = (64, 128)
+OUTPUT_SHAPE = (50, 150)
 
-CHARS = common.CHARS + " "
+CHARS = common.CHARS.replace("_", " ")
 
 
 def make_char_ims(output_height):
     font_size = output_height * 4
-
     font = ImageFont.truetype(FONT_PATH, font_size)
+    height = 16+max(font.getsize(c)[1] for c in common.DIGITS)
 
-    height = max(font.getsize(c)[1] for c in CHARS)
-
-    for c in CHARS:
+    for c in common.DIGITS:
         width = font.getsize(c)[0]
         im = Image.new("RGBA", (width, height), (0, 0, 0))
 
         draw = ImageDraw.Draw(im)
-        draw.text((0, 0), c, (255, 255, 255), font=font)
+        draw.text((0, 17), c, (255, 255, 255), font=font)
         scale = float(output_height) / height
         im = im.resize((int(width * scale), output_height), Image.ANTIALIAS)
+        #cv2.imwrite(c+".png", numpy.array(im))
         yield c, numpy.array(im)[:, :, 0].astype(numpy.float32) / 255.
+
+    font_size = output_height * 3
+    font = ImageFont.truetype(FONT_PATH, font_size)
+    height -= 16
+    for c in common.LETTERS:
+        width = font.getsize(c)[0]
+        im = Image.new("RGBA", (width, height), (0, 0, 0))
+
+        draw = ImageDraw.Draw(im)
+        draw.text((0, 10), c, (255, 255, 255), font=font)
+        scale = float(output_height) / height * 0.7
+        im = im.resize((int(width * scale), output_height), Image.ANTIALIAS)
+        yield c, numpy.array(im)[:, :, 0].astype(numpy.float32) / 255.
+
+    for c in common.DIGITS:
+        width = font.getsize(c)[0]
+        im = Image.new("RGBA", (width, height), (0, 0, 0))
+
+        draw = ImageDraw.Draw(im)
+        draw.text((0, 10), c, (255, 255, 255), font=font)
+        scale = float(output_height) / height * 0.7
+        im = im.resize((int(width * scale), output_height), Image.ANTIALIAS)
+
+        yield "_"+c, numpy.array(im)[:, :, 0].astype(numpy.float32) / 255.
 
 
 def euler_to_mat(yaw, pitch, roll):
@@ -106,7 +129,7 @@ def pick_colors():
     return text_color, plate_color
 
 
-def make_affine_transform(from_shape, to_shape, 
+def make_affine_transform(code, from_shape, to_shape,
                           min_scale, max_scale,
                           scale_variation=1.0,
                           rotation_variation=1.0,
@@ -116,10 +139,11 @@ def make_affine_transform(from_shape, to_shape,
     from_size = numpy.array([[from_shape[1], from_shape[0]]]).T
     to_size = numpy.array([[to_shape[1], to_shape[0]]]).T
 
-    scale = random.uniform((min_scale + max_scale) * 0.5 -
-                           (max_scale - min_scale) * 0.5 * scale_variation,
-                           (min_scale + max_scale) * 0.5 +
-                           (max_scale - min_scale) * 0.5 * scale_variation)
+    scale = random.uniform((min_scale + max_scale) * 0.3 -
+                           (max_scale - min_scale) * 0.3 * scale_variation,
+                           (min_scale + max_scale) * 0.3 +
+                           (max_scale - min_scale) * 0.3 * scale_variation)
+    print code, " ", scale
     if scale > max_scale or scale < min_scale:
         out_of_bounds = True
     roll = random.uniform(-0.3, 0.3) * rotation_variation
@@ -142,6 +166,7 @@ def make_affine_transform(from_shape, to_shape,
     # the output shape's bounds.
     trans = (numpy.random.random((2,1)) - 0.5) * translation_variation
     trans = ((2.0 * trans) ** 5.0) / 2.0
+    print code, " ", trans
     if numpy.any(trans < -0.5) or numpy.any(trans > 0.5):
         out_of_bounds = True
     trans = (to_size - skewed_size * scale) * trans
@@ -157,14 +182,28 @@ def make_affine_transform(from_shape, to_shape,
 
 
 def generate_code():
-    return "{}{}{}{} {}{}{}".format(
-        random.choice(common.LETTERS),
-        random.choice(common.LETTERS),
-        random.choice(common.DIGITS),
-        random.choice(common.DIGITS),
-        random.choice(common.LETTERS),
-        random.choice(common.LETTERS),
-        random.choice(common.LETTERS))
+    if random.choice((True, False)) :
+        return "{}{}{}{}{}{}{}{}".format(
+            random.choice(common.LETTERS),
+            random.choice(common.DIGITS),
+            random.choice(common.DIGITS),
+            random.choice(common.DIGITS),
+            random.choice(common.LETTERS),
+            random.choice(common.LETTERS),
+            random.choice(common.DIGITS),
+            random.choice(common.DIGITS))
+    else:
+        return "{}{}{}{}{}{}{}{}{}".format(
+            random.choice(common.LETTERS),
+            random.choice(common.DIGITS),
+            random.choice(common.DIGITS),
+            random.choice(common.DIGITS),
+            random.choice(common.LETTERS),
+            random.choice(common.LETTERS),
+            random.choice("17"),
+            random.choice(common.DIGITS),
+            random.choice(common.DIGITS))
+
 
 
 def rounded_rect(shape, radius):
@@ -183,9 +222,9 @@ def rounded_rect(shape, radius):
 
 
 def generate_plate(font_height, char_ims):
-    h_padding = random.uniform(0.2, 0.4) * font_height
-    v_padding = random.uniform(0.1, 0.3) * font_height
-    spacing = font_height * random.uniform(-0.05, 0.05)
+    h_padding = random.uniform(0.3, 0.4) * font_height
+    v_padding = random.uniform(0.2, 0.4) * font_height
+    spacing = font_height * random.uniform(0.05, 0.15)
     radius = 1 + int(font_height * 0.1 * random.random())
 
     code = generate_code()
@@ -200,9 +239,14 @@ def generate_plate(font_height, char_ims):
     text_mask = numpy.zeros(out_shape)
     
     x = h_padding
-    y = v_padding 
+    y = v_padding
+    idx = 0
     for c in code:
-        char_im = char_ims[c]
+        if idx>5 :
+            char_im = char_ims["_"+c]
+        else:
+            char_im = char_ims[c]
+        idx += 1
         ix, iy = int(x), int(y)
         text_mask[iy:iy + char_im.shape[0], ix:ix + char_im.shape[1]] = char_im
         x += char_im.shape[1] + spacing
@@ -217,7 +261,8 @@ def generate_bg(num_bg_images):
     found = False
     while not found:
         fname = "bgs/{:08d}.jpg".format(random.randint(0, num_bg_images - 1))
-        bg = cv2.imread(fname, cv2.CV_LOAD_IMAGE_GRAYSCALE) / 255.
+        print fname
+        bg = cv2.imread(fname, cv2.IMREAD_GRAYSCALE) / 255.
         if (bg.shape[1] >= OUTPUT_SHAPE[1] and
             bg.shape[0] >= OUTPUT_SHAPE[0]):
             found = True
@@ -233,12 +278,13 @@ def generate_im(char_ims, num_bg_images):
     bg = generate_bg(num_bg_images)
 
     plate, plate_mask, code = generate_plate(FONT_HEIGHT, char_ims)
-    
+    print plate.shape
     M, out_of_bounds = make_affine_transform(
+                            code,
                             from_shape=plate.shape,
                             to_shape=bg.shape,
-                            min_scale=0.6,
-                            max_scale=0.875,
+                            min_scale=0.9,
+                            max_scale=1.3,
                             rotation_variation=1.0,
                             scale_variation=1.5,
                             translation_variation=1.2)
@@ -248,7 +294,6 @@ def generate_im(char_ims, num_bg_images):
     out = plate * plate_mask + bg * (1.0 - plate_mask)
 
     out = cv2.resize(out, (OUTPUT_SHAPE[1], OUTPUT_SHAPE[0]))
-
     out += numpy.random.normal(scale=0.05, size=out.shape)
     out = numpy.clip(out, 0., 1.)
 
@@ -274,10 +319,13 @@ def generate_ims(num_images):
 
 
 if __name__ == "__main__":
-    os.mkdir("test")
+    os.mkdir("gen")
     im_gen = generate_ims(int(sys.argv[1]))
     for img_idx, (im, c, p) in enumerate(im_gen):
-        fname = "test/{:08d}_{}_{}.png".format(img_idx, c,
+        reg = c[ 6: ]
+        os.mkdir("gen/"+reg)
+        os.mkdir("gen/"+reg+"/"+c)
+        fname = "gen/{}/{}/{:08d}_{}_{}.png".format(reg, c, img_idx, c,
                                                "1" if p else "0")
         print fname
         cv2.imwrite(fname, im * 255.)
