@@ -116,7 +116,7 @@ class POSTHandler(BaseHTTPRequestHandler):
         param_vals = [f[n] for n in sorted(f.files, key=lambda s: int(s[4:]))]
         lastPlates = dict()
         while True:
-            item, camId = POSTHandler.q.get()
+            item, camId, fname = POSTHandler.q.get()
             try:
                 import time
                 im_gray = cv2.resize(item, (128, 64))
@@ -126,14 +126,16 @@ class POSTHandler(BaseHTTPRequestHandler):
                 code = POSTHandler.letter_probs_to_code(letter_probs)
                 oldTime, oldCode = lastPlates.get(camId, (0, ""))
                 now = time.time()
+                import datetime
+                strNow = datetime.datetime.fromtimestamp(s).strftime('%Y-%m-%d %H:%M:%S.%f')
                 if code == oldCode and now - oldTime<30:
-                    print "skip repeated plate: ", code, "; time: ", now-oldTime, "; CNN time: ", (end-start)
+                    print strNow,  " skip repeated plate: ", code, "; file: ", fname, "; time: ", now-oldTime, "; CNN time: ", (end-start)
                 else:
-                    print "post plicense plate: ", code, "; time: ", now, "; CNN time: ", (end-start)
+                    print strNow, " post license plate: ", code, "; file: ", fname, "; CNN time: ", (end-start)
                     lastPlates[camId] = (now, code)
                     import requests
                     r = requests.post("http://localhost/api/service/platerecognition", data={'number': code, 'id': camId})
-                    # r = requests.post("https://green-pay.net/api/service/platerecognition", data={'number': code, 'type': 'issue', 'action': 'show'})
+                    # r = requests.post("https://green-pay.net/api/service/platerecognition", data={'number': code, 'id': camId})
                     print present_prob, " ", code, " ", r.status_code, r.reason
                     sys.stdout.flush()
             except ConnectionError as e:
@@ -173,8 +175,8 @@ class POSTHandler(BaseHTTPRequestHandler):
         finally:
             f.close()
         image = cv2.imdecode(numpy.frombuffer(content, dtype='ubyte'), 0)
-        pair = (image, camId)
-        POSTHandler.q.put(pair)
+        triple = (image, camId, fname)
+        POSTHandler.q.put(triple)
 
 
 def run_on(port):
