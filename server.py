@@ -127,15 +127,16 @@ class POSTHandler(BaseHTTPRequestHandler):
                 oldTime, oldCode = lastPlates.get(camId, (0, ""))
                 now = time.time()
                 import datetime
-                strNow = datetime.datetime.fromtimestamp(s).strftime('%Y-%m-%d %H:%M:%S.%f')
+                strNow = datetime.datetime.fromtimestamp(now).strftime('%Y-%m-%d %H:%M:%S.%f')
                 if code == oldCode and now - oldTime<30:
                     print strNow,  " skip repeated plate: ", code, "; file: ", fname, "; time: ", now-oldTime, "; CNN time: ", (end-start)
                 else:
                     print strNow, " post license plate: ", code, "; file: ", fname, "; CNN time: ", (end-start)
                     lastPlates[camId] = (now, code)
                     import requests
-                    r = requests.post("http://localhost/api/service/platerecognition", data={'number': code, 'id': camId})
-                    # r = requests.post("https://green-pay.net/api/service/platerecognition", data={'number': code, 'id': camId})
+                    headers = {'Content-type': 'application/json'}
+                    #r = requests.post("http://localhost/api/service/platerecognition", data={'number': code, 'id': camId})
+                    r = requests.post("https://green-pay.net/api/service/platerecognition", data={'number': code, 'id': camId}, headers=headers)
                     print present_prob, " ", code, " ", r.status_code, r.reason
                     sys.stdout.flush()
             except ConnectionError as e:
@@ -181,7 +182,7 @@ class POSTHandler(BaseHTTPRequestHandler):
 
 def run_on(port):
     print("Starting a server on port %i" % port)
-    server_address = ('localhost', port)
+    server_address = ('0.0.0.0', port)
     POSTHandler.startWorkerThread()
     httpd = HTTPServer(server_address, POSTHandler)
     httpd.serve_forever()
