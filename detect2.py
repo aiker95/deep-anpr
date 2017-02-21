@@ -115,10 +115,26 @@ if __name__ == "__main__":
     f = numpy.load(sys.argv[1])
     param_vals = [f[n] for n in sorted(f.files, key=lambda s: int(s[4:]))]
     import sys
+    total = 0
+    bad = 0
     while True:
-        im = cv2.resize(cv2.imread(sys.stdin.readline().strip()), (128, 64))
+        curPath =  sys.stdin.readline().strip()
+        correct = curPath.split("/")[-2]
+        im = cv2.resize(cv2.imread(curPath), (128, 64))
         im_gray = cv2.cvtColor(im, cv2.COLOR_RGB2GRAY) / 255.
         for present_prob, letter_probs in detect(im_gray, param_vals):
             code = letter_probs_to_code(letter_probs)
-            print present_prob, " ", code
-            sys.stdout.flush()
+            #print present_prob, " ", code
+            #sys.stdout.flush()
+            total += 1
+            if len(correct)==8:
+                correct += "_"
+            if code != correct :
+                bad += 1
+                print 100.0*(total-bad)/total, '\t', correct, "\t", code, "\t", curPath
+                import shutil
+                import os.path
+                dest = "bad/"+correct
+                if not os.path.exists(dest) :
+                   os.mkdir(dest)
+                shutil.copy(curPath.strip(), dest)

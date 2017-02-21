@@ -60,27 +60,40 @@ def code_to_vec(p, code):
 
     return numpy.concatenate([[1. if p else 0], c.flatten()])
 
-def read_console():
-    while True:
-        line = sys.stdin.readline()
-        yield line.strip()
-
-
 def read_data():
-    for fname in read_console():
+    while True:
+        # if random.randint(0, 100)<10 :
+        fname = sys.stdin.readline().strip()
         #print "=", fname, "|"
         try:
-            im = cv2.resize(cv2.imread(fname), (128, 64))[:, :, 0].astype(numpy.float32) / 255.
+            im = cv2.imread(fname)
+            im = cv2.copyMakeBorder(im, 1, 1, 1, 1, cv2.BORDER_CONSTANT, value=[255.0]) 
+            im = cv2.resize(im, (128, 64))[:, :, 0].astype(numpy.float32) / 255.
         except:
             print "fail on ", fname
             continue
-
-        code = fname.split("/")[-2]
+        if "/new" in fname:
+            code = fname.split("/")[-1][9:18]
+        else:
+            code = fname.split("/")[-2]
         if len(code)==8:
             code += "_"
-        p = len(code)==9
-        #print code , " ", p
+        p = 1
+        if "/bad/" in fname:
+            p = 0
+            code = "A000AA000"
+        # else:
+        #     import gen
+        #     p = False
+        #     while not p :
+        #         im, code, p = gen.generate_im(100000)
+        #     p = 1
+        #     if len(code)==8:
+        #         code = code +"_"
+
+        #print code , " ", p, " "
         yield im, code_to_vec(p, code)
+
 
 def read_validation_data():
     f = []
@@ -89,7 +102,9 @@ def read_validation_data():
         break
     for fname in f:
         #print "=", fname, "|"
-        im = cv2.resize(cv2.imread("validation/"+fname), (128, 64))[:, :, 0].astype(numpy.float32) / 255.
+        im = cv2.imread("validation/"+fname)
+        im = cv2.copyMakeBorder(im, 1, 1, 1, 1, cv2.BORDER_CONSTANT, value=[255.0])
+        im = cv2.resize(im, (128, 64))[:, :, 0].astype(numpy.float32) / 255.
 
         tmp = fname.split("/")[-1].split("-")
         code = tmp[1]
@@ -185,23 +200,30 @@ def train(learn_rate, report_steps, batch_size, initial_weights=None):
             print "{} {} <-> {} {}".format(vec_to_plate(c), pc,
                                            vec_to_plate(b), float(pb))
         num_p_correct = numpy.sum(r[2] == r[3])
-
+        good = 100. * num_correct / (len(r[0]))
         print ("B{:3d} {:2.02f}% {:02.02f}% loss: {} "
                "(digits: {}, presence: {}) |{}|").format(
             batch_idx,
-            100. * num_correct / (len(r[0])),
+            good,
             100. * num_p_correct / len(r[2]),
             r[6],
             r[4],
             r[5],
             "".join("X "[numpy.array_equal(b, c) or (not pb and not pc)]
                                            for b, c, pb, pc in zip(*r_short)))
+        return r[6]
+
+    #def do_report():
+    #    feed_dict = {x: batch_xs, y_: batch_ys, keep_prob: 0.5}
+    #    return do_report()
 
     def do_batch():
         feed_dict = {x: batch_xs, y_: batch_ys, keep_prob: 0.5}
         sess.run(train_step, feed_dict)
+        rs = 1000
         if batch_idx % report_steps == 0:
-            do_report()
+            rs = do_report()
+        return rs
 
     gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.95)
     with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options)) as sess:
@@ -209,18 +231,33 @@ def train(learn_rate, report_steps, batch_size, initial_weights=None):
         if initial_weights is not None:
             sess.run(assign_ops)
 
+
+        batch_idx = 0
         test_xs, test_ys = unzip(read_validation_data())
         print "after read_data"
+        do_report()
+        best_loss = 240
         try:
             last_batch_idx = 0
             last_batch_time = time.time()
             print "before read batch"
             batch_iter = read_batches(batch_size)
             print "after read batch"
-            batch_idx = 0
             for (batch_xs, batch_ys) in batch_iter:
+
                 batch_idx += 1
-                do_batch()
+                loss = do_batch()
+                if batch_idx>100 and loss<best_loss:
+                    print "save and continue: best = "+ str(loss)
+                    last_weights = [p.eval() for p in params]
+                    best_loss = loss
+                    numpy.savez("weights_best_"+str(loss)+".npz", *last_weights)
+                if batch_idx==50000:
+                    print "save and finish"
+                    last_weights = [p.eval() for p in params]
+                    numpy.savez("weights.npz", *last_weights)
+                    break
+
                 if batch_idx % report_steps == 0:
                     batch_time = time.time()
                     if last_batch_idx != batch_idx:

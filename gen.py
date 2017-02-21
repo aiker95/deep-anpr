@@ -45,32 +45,16 @@ from PIL import Image
 from PIL import ImageDraw
 from PIL import ImageFont
 
-import common
-
-FONT_PATH = "UKNumberPlate.ttf"
-FONT_HEIGHT = 32  # Pixel size to which the chars are resized
-
-OUTPUT_SHAPE = (64, 128)
-
-CHARS = common.CHARS + " "
+DIGITS  = "0123456789"
+LETTERS = "ABCEHKMOPTXY"
 
 
-def make_char_ims(output_height):
-    font_size = output_height * 4
+FONT_PATH = "RoadNumbers2.0.ttf"
+FONT_HEIGHT = 18  # Pixel size to which the chars are resized
 
-    font = ImageFont.truetype(FONT_PATH, font_size)
+OUTPUT_SHAPE = (50, 150)
 
-    height = max(font.getsize(c)[1] for c in CHARS)
 
-    for c in CHARS:
-        width = font.getsize(c)[0]
-        im = Image.new("RGBA", (width, height), (0, 0, 0))
-
-        draw = ImageDraw.Draw(im)
-        draw.text((0, 0), c, (255, 255, 255), font=font)
-        scale = float(output_height) / height
-        im = im.resize((int(width * scale), output_height), Image.ANTIALIAS)
-        yield c, numpy.array(im)[:, :, 0].astype(numpy.float32) / 255.
 
 
 def euler_to_mat(yaw, pitch, roll):
@@ -106,7 +90,7 @@ def pick_colors():
     return text_color, plate_color
 
 
-def make_affine_transform(from_shape, to_shape, 
+def make_affine_transform(from_shape, to_shape,
                           min_scale, max_scale,
                           scale_variation=1.0,
                           rotation_variation=1.0,
@@ -120,11 +104,12 @@ def make_affine_transform(from_shape, to_shape,
                            (max_scale - min_scale) * 0.5 * scale_variation,
                            (min_scale + max_scale) * 0.5 +
                            (max_scale - min_scale) * 0.5 * scale_variation)
-    if scale > max_scale or scale < min_scale:
+    if scale > max_scale*1.1 or scale < min_scale:
+        #print "out #1 ", scale, max_scale, min_scale
         out_of_bounds = True
-    roll = random.uniform(-0.3, 0.3) * rotation_variation
-    pitch = random.uniform(-0.2, 0.2) * rotation_variation
-    yaw = random.uniform(-1.2, 1.2) * rotation_variation
+    roll = random.uniform(-0.15, 0.15) * rotation_variation
+    pitch = random.uniform(-0.1, 0.1) * rotation_variation
+    yaw = random.uniform(-1.1, 1.1) * rotation_variation
 
     # Compute a bounding box on the skewed input image (`from_shape`).
     M = euler_to_mat(yaw, pitch, roll)[:2, :2]
@@ -148,7 +133,6 @@ def make_affine_transform(from_shape, to_shape,
 
     center_to = to_size / 2.
     center_from = from_size / 2.
-
     M = euler_to_mat(yaw, pitch, roll)[:2, :2]
     M *= scale
     M = numpy.hstack([M, trans + center_to - M * center_from])
@@ -157,14 +141,29 @@ def make_affine_transform(from_shape, to_shape,
 
 
 def generate_code():
-    return "{}{}{}{} {}{}{}".format(
-        random.choice(common.LETTERS),
-        random.choice(common.LETTERS),
-        random.choice(common.DIGITS),
-        random.choice(common.DIGITS),
-        random.choice(common.LETTERS),
-        random.choice(common.LETTERS),
-        random.choice(common.LETTERS))
+    if random.choice((True, False)) :
+        return "{}{}{}{}{}{}{}{}".format(
+            random.choice(LETTERS),
+            random.choice(DIGITS),
+            random.choice(DIGITS),
+            random.choice(DIGITS),
+            random.choice(LETTERS),
+            random.choice(LETTERS),
+            random.choice(DIGITS),
+            random.choice(DIGITS))
+    else:
+        return "{}{}{}{}{}{}{}".format(
+            random.choice(LETTERS),
+            random.choice(DIGITS),
+            random.choice(DIGITS),
+            random.choice(DIGITS),
+            random.choice(LETTERS),
+            random.choice(LETTERS),
+            random.choice(["102", "103", "113", "116", "121", "123", "124", "125", "126", "134",
+                           "136", "138", "142", "150", "190", "750", "152", "154", "159", "161",
+                           "163", "164", "196", "173", "174", "177", "197", "199", "777", "178",
+                           "186"]))
+
 
 
 def rounded_rect(shape, radius):
@@ -181,43 +180,51 @@ def rounded_rect(shape, radius):
 
     return out
 
+def set_numbers(svg, numbers='m976mm34'):
+    import xml.etree.ElementTree as ET
+    tree = ET.fromstring(svg)
 
-def generate_plate(font_height, char_ims):
-    h_padding = random.uniform(0.2, 0.4) * font_height
-    v_padding = random.uniform(0.1, 0.3) * font_height
-    spacing = font_height * random.uniform(-0.05, 0.05)
-    radius = 1 + int(font_height * 0.1 * random.random())
+    for elem in tree.iter('{http://www.w3.org/2000/svg}text'):
+        id = elem.attrib['id']
+        if id.startswith('plate'):
+            text = ''
+            for c in id[5:]:
+                text += numbers[int(c)]
+            elem[0].text = text
+    return ET.tostring(tree)
 
+def generate_plate():
     code = generate_code()
-    text_width = sum(char_ims[c].shape[1] for c in code)
-    text_width += (len(code) - 1) * spacing
+    import cairo
+    import rsvg
+    img = cairo.ImageSurface(cairo.FORMAT_ARGB32, 520, 112)
+    ctx = cairo.Context(img)
+    if len(code)==8 :
+        codeSvg = open(os.path.join(os.path.dirname(__file__), 'ru.svg'), 'r').read()
+    elif len(code)==9 :
+        codeSvg = open(os.path.join(os.path.dirname(__file__), 'ru2.svg'), 'r').read()
+    else:
+        exit(-1)
+    codeSvg= set_numbers(codeSvg, numbers=code)
+    handle = rsvg.Handle(None, codeSvg)
+    handle.render_cairo(ctx)
 
-    out_shape = (int(font_height + v_padding * 2),
-                 int(text_width + h_padding * 2))
-
-    text_color, plate_color = pick_colors()
-    
-    text_mask = numpy.zeros(out_shape)
-    
-    x = h_padding
-    y = v_padding 
-    for c in code:
-        char_im = char_ims[c]
-        ix, iy = int(x), int(y)
-        text_mask[iy:iy + char_im.shape[0], ix:ix + char_im.shape[1]] = char_im
-        x += char_im.shape[1] + spacing
-
-    plate = (numpy.ones(out_shape) * plate_color * (1. - text_mask) +
-             numpy.ones(out_shape) * text_color * text_mask)
-
-    return plate, rounded_rect(out_shape, radius), code.replace(" ", "")
+    buf = img.get_data()
+    a = numpy.frombuffer(buf, numpy.uint8)
+    a.shape = (112, 520, 4)
+    a[:, :, 2] = 255
+    a = cv2.resize(a, (150,50))
+    a = cv2.cvtColor(a, cv2.COLOR_BGR2GRAY) / 255.0
+    out_shape = (50, 150)
+    radius = 4
+    return a, rounded_rect(out_shape, radius), code.replace(" ", "")
 
 
 def generate_bg(num_bg_images):
     found = False
     while not found:
         fname = "bgs/{:08d}.jpg".format(random.randint(0, num_bg_images - 1))
-        bg = cv2.imread(fname, cv2.CV_LOAD_IMAGE_GRAYSCALE) / 255.
+        bg = cv2.imread(fname, 0) / 255.
         if (bg.shape[1] >= OUTPUT_SHAPE[1] and
             bg.shape[0] >= OUTPUT_SHAPE[0]):
             found = True
@@ -229,23 +236,24 @@ def generate_bg(num_bg_images):
     return bg
 
 
-def generate_im(char_ims, num_bg_images):
+def generate_im(num_bg_images):
     bg = generate_bg(num_bg_images)
 
-    plate, plate_mask, code = generate_plate(FONT_HEIGHT, char_ims)
-    
+    plate, plate_mask, code = generate_plate()
+
     M, out_of_bounds = make_affine_transform(
                             from_shape=plate.shape,
                             to_shape=bg.shape,
-                            min_scale=0.6,
-                            max_scale=0.875,
-                            rotation_variation=1.0,
+                            min_scale=0.7,
+                            max_scale=1,
+                            rotation_variation=0.8,
                             scale_variation=1.5,
                             translation_variation=1.2)
     plate = cv2.warpAffine(plate, M, (bg.shape[1], bg.shape[0]))
-    plate_mask = cv2.warpAffine(plate_mask, M, (bg.shape[1], bg.shape[0]))
+    #plate_mask = cv2.warpAffine(plate_mask, M, (bg.shape[1], bg.shape[0]))
 
-    out = plate * plate_mask + bg * (1.0 - plate_mask)
+    out = plate*0.6 + bg*0.4
+    #out = plate * plate_mask + bg * (1.0 - plate_mask)/2 + bg/2
 
     out = cv2.resize(out, (OUTPUT_SHAPE[1], OUTPUT_SHAPE[0]))
 
@@ -267,18 +275,19 @@ def generate_ims(num_images):
 
     """
     variation = 1.0
-    char_ims = dict(make_char_ims(FONT_HEIGHT))
     num_bg_images = len(os.listdir("bgs"))
     for i in range(num_images):
-        yield generate_im(char_ims, num_bg_images)
+        yield generate_im(num_bg_images)
 
 
 if __name__ == "__main__":
     os.mkdir("test")
     im_gen = generate_ims(int(sys.argv[1]))
     for img_idx, (im, c, p) in enumerate(im_gen):
-        fname = "test/{:08d}_{}_{}.png".format(img_idx, c,
+        fname = "test/{}/{:08d}_{}_{}.png".format(c, img_idx, c,
                                                "1" if p else "0")
-        print fname
-        cv2.imwrite(fname, im * 255.)
+        print (fname)
+        if p:
+            if not os.path.exists("test/"+c) : os.mkdir("test/"+c)
+            cv2.imwrite(fname, im * 255.)
 

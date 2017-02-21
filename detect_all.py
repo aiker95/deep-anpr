@@ -24,6 +24,39 @@ import tensorflow as tf
 import common
 import model
 
+def _overlaps(match1, match2):
+    bbox_tl1, bbox_br1, _, _ = match1
+    bbox_tl2, bbox_br2, _, _ = match2
+    return (bbox_br1[0] > bbox_tl2[0] and
+	    bbox_br2[0] > bbox_tl1[0] and
+	    bbox_br1[1] > bbox_tl2[1] and
+	    bbox_br2[1] > bbox_tl1[1])
+
+
+def _group_overlapping_rectangles(matches):
+    matches = list(matches)
+    num_groups = 0
+    match_to_group = {}
+    for idx1 in range(len(matches)):
+        for idx2 in range(idx1):
+	    if _overlaps(matches[idx1], matches[idx2]):
+		match_to_group[idx1] = match_to_group[idx2]
+		break
+	else:
+	    match_to_group[idx1] = num_groups 
+	    num_groups += 1
+
+    groups = collections.defaultdict(list)
+    for idx, group in match_to_group.items():
+	groups[group].append(matches[idx])
+
+    return groups
+
+def letter_probs_to_code(letter_probs):
+    return "".join(common.CHARS[i] for i in numpy.argmax(letter_probs, axis=1))
+
+
+
 # Load the model which detects number plates over a sliding window.
 x, y, params = model.get_detect_model()
 
@@ -78,56 +111,40 @@ with tf.Session(config=tf.ConfigProto()) as sess:
         #yield bbox_tl, bbox_tl + bbox_size, present_prob, letter_probs
         yield present_prob, letter_probs
 
+    if __name__ == "__main__":
 
-def _overlaps(match1, match2):
-    bbox_tl1, bbox_br1, _, _ = match1
-    bbox_tl2, bbox_br2, _, _ = match2
-    return (bbox_br1[0] > bbox_tl2[0] and
-            bbox_br2[0] > bbox_tl1[0] and
-            bbox_br1[1] > bbox_tl2[1] and
-            bbox_br2[1] > bbox_tl1[1])
+        f = numpy.load(sys.argv[1])
+        param_vals = [f[n] for n in sorted(f.files, key=lambda s: int(s[4:]))]
+        import sys
+        import os
+        from fnmatch import fnmatch
 
+        root = sys.argv[2]
+        pattern = "*.png"
 
-def _group_overlapping_rectangles(matches):
-    matches = list(matches)
-    num_groups = 0
-    match_to_group = {}
-    for idx1 in range(len(matches)):
-        for idx2 in range(idx1):
-            if _overlaps(matches[idx1], matches[idx2]):
-                match_to_group[idx1] = match_to_group[idx2]
-                break
-        else:
-            match_to_group[idx1] = num_groups 
-            num_groups += 1
-
-    groups = collections.defaultdict(list)
-    for idx, group in match_to_group.items():
-        groups[group].append(matches[idx])
-
-    return groups
-
-def letter_probs_to_code(letter_probs):
-    return "".join(common.CHARS[i] for i in numpy.argmax(letter_probs, axis=1))
-
-
-if __name__ == "__main__":
-
-    f = numpy.load(sys.argv[1])
-    param_vals = [f[n] for n in sorted(f.files, key=lambda s: int(s[4:]))]
-    import sys
-    import os
-    from fnmatch import fnmatch
-
-    root = sys.argv[2]
-    pattern = "*.png"
-
-    for path, subdirs, files in os.walk(root):
-        for name in files:
-            if fnmatch(name, pattern):
-                curPath = os.path.join(path, name)
-                im = cv2.resize(cv2.imread(curPath.strip()), (128, 64))
-                im_gray = cv2.cvtColor(im, cv2.COLOR_RGB2GRAY) / 255.
-                for present_prob, letter_probs in detect(im_gray, param_vals):
-                    code = letter_probs_to_code(letter_probs)
-                    print curPath.split("/")[-2], "\t", code, "\t", curPath
+        total = 0.0
+        bad = 0.0
+        for path, subdirs, files in os.walk(root):
+            for name in files:
+                if fnmatch(name, pattern):
+                    curPath = os.path.join(path, name)
+                    im = cv2.imread(curPath.strip())
+                    im = cv2.copyMakeBorder(im, 1, 1, 1, 1, cv2.BORDER_CONSTANT, value=[255.0])
+                    im = cv2.resize(im, (128, 64))
+                    im_gray = cv2.cvtColor(im, cv2.COLOR_RGB2GRAY) / 255.
+                    for present_prob, letter_probs in detect(im_gray, param_vals):
+                        code = letter_probs_to_code(letter_probs)
+                        correct = curPath.split("/")[-1].split("-")[1]
+                        #correct = curPath.split("/")[-2]
+                        total += 1
+                        if len(correct)==8:
+                            correct += "_" 
+                        if code != correct :
+                            bad += 1
+                            import shutil
+                            import os.path
+                            dest = "bad/"+correct
+                            if not os.path.exists(dest) : 
+                                os.mkdir(dest)
+                            shutil.copy(curPath.strip(), dest)
+                        print total, "\t", 100.0*(total-bad)/total, '\t', correct, "\t", code, "\t", curPath
